@@ -13,6 +13,7 @@ upgrade_cost = float(1.5)
 upgrade_cost_passive = float(.75)
 upgrade_level = 0
 upgrade_level_passive = 0
+total_money = float(0)
 
 count = 0
 click_power = float(.01)
@@ -31,6 +32,12 @@ pygame.mixer.music.load(os.path.join(py_dir, "background_music.mp3"))
 pygame.mixer.music.set_volume(0.3)
 pygame.mixer.music.play(-1)
 
+buy_sound = pygame.mixer.Sound(os.path.join(py_dir, "purchase.mp3"))
+buy_sound.set_volume(0.4)
+
+no_buy_sound = pygame.mixer.Sound(os.path.join(py_dir, "no_purchase.mp3"))
+no_buy_sound.set_volume(0.6)
+
 is_muted = False
 volume = 0.3
 
@@ -44,14 +51,15 @@ def save_game():
         "upgrade_level": upgrade_level,
         "upgrade_level_passive": upgrade_level_passive,
         "upgrade_cost": upgrade_cost,
-        "upgrade_cost_passive": upgrade_cost_passive
+        "upgrade_cost_passive": upgrade_cost_passive,
+        "total_money": total_money
     }
     with open(SAVE_FILE, "w") as f:
         json.dump(data, f, indent=4)
     print("Game saved!")
 
 def load_game():
-    global money, count, click_power, passive_income
+    global money, count, click_power, passive_income, total_money
     global upgrade_level, upgrade_level_passive, upgrade_cost, upgrade_cost_passive
 
     if not os.path.exists(SAVE_FILE):
@@ -69,14 +77,16 @@ def load_game():
     upgrade_level_passive = data["upgrade_level_passive"]
     upgrade_cost = data["upgrade_cost"]
     upgrade_cost_passive = data["upgrade_cost_passive"]
+    total_money = data["total_money"]
     print("Game loaded!")
 
 def load_ui():
     label.config(text=(f"${money:.2f}"))
     purchase_button.config(text=f"Purchase Click Upgrade: ${upgrade_cost:.2f}")
     purchase_button_passive.config(text=f"Purchase Passive Upgrade: ${upgrade_cost_passive:.2f}")
-    current_power.config(text=(f"$ Per Click: ${click_power:.2f}"))
+    current_power.config(text=(f"$ Per Click: ${click_power:.3f}"))
     money_per_sec.config(text=(f"$ Per Second: ${passive_income:.3f}"))
+    total_money_label.config(text=(f"Total Earned: ${float(total_money):.3f}"))
 
 def autosave():
     save_game()
@@ -99,24 +109,27 @@ def change_volume(val):
         pygame.mixer.music.set_volume(volume)
 
 def click():
-    global count, money
+    global count, money, total_money
     count += 1
     money +=  click_power
+    total_money += click_power
     print(f"Money: ${money:.2f} | Clicks: {count}")
-    label.config(text=(f"$:{money:.2f}"))
+    label.config(text=(f"${money:.2f}"))
 
 def purchase_upgrade():
     global money, upgrade_cost, upgrade_level, click_power
     if money >= upgrade_cost:
         money -= upgrade_cost
         upgrade_level += 1
-        click_power = float(0.01 * (upgrade_level ** 0.6 + 1))
+        buy_sound.play()
+        click_power = float(0.01 * (upgrade_level ** 0.9 + 1))
         upgrade_cost = float(1.5 * (1.2 ** upgrade_level))
-        purchase_button.config(text=f"Purchase Upgrade: ${upgrade_cost:.2f}")
-        label.config(text=(f"$:{money:.2f}"))
-        current_power.config(text=(f"$ Per Click: ${float(click_power):.2f}"))
-        print(f"Upgrade purchased! Multiplier: {click_power}x | Next upgrade: {upgrade_cost:.2f}")
+        purchase_button.config(text=f"Purchase Click Upgrade: ${upgrade_cost:.2f}")
+        label.config(text=(f"${money:.2f}"))
+        current_power.config(text=(f"$ Per Click: ${float(click_power):.3f}"))
+        print(f"Upgrade purchased! Multiplier: {click_power}x | Next upgrade: {upgrade_cost:.3f}")
     else:
+        no_buy_sound.play()
         print(f"Not enough money! Need {upgrade_cost}, have {money}")
 
 def purchase_upgrade_passive():
@@ -124,19 +137,23 @@ def purchase_upgrade_passive():
     if money >= upgrade_cost_passive:
         money -= upgrade_cost_passive
         upgrade_level_passive += 1
-        passive_income = float(0.005 * (upgrade_level_passive ** 0.5 + 1))
+        buy_sound.play()
+        passive_income = float(0.01 * (upgrade_level_passive ** 0.65 + 1))
         upgrade_cost_passive = float(0.75 * (1.14 ** upgrade_level_passive))
-        purchase_button_passive.config(text=f"Purchase Passive Income: ${upgrade_cost_passive:.2f}")
-        label.config(text=(f"$: {money:.2f}"))
+        purchase_button_passive.config(text=f"Purchase Passive Upgrade: ${upgrade_cost_passive:.2f}")
+        label.config(text=(f"${money:.2f}"))
         money_per_sec.config(text=(f"$ Per Second: ${float(passive_income):.3f}"))
-        print(f"Upgrade purchased! Passive Income: {passive_income}x | Next upgrade: {upgrade_cost_passive:.2f}")
+        print(f"Upgrade purchased! Passive Income: {passive_income}x | Next upgrade: {upgrade_cost_passive:.3f}")
     else:
+        no_buy_sound.play()
         print(f"Not enough money! Need {upgrade_cost_passive}, have {money}")
     
 def money_per_second():
-    global money
+    global money, total_money
     money += passive_income
-    label.config(text=(f"$:{money:.2f}"))
+    total_money += passive_income
+    label.config(text=(f"${money:.2f}"))
+    total_money_label.config(text=(f"Total Earned: ${float(total_money):.3f}"))
     window.after(1000, money_per_second)
 
 def on_close():
@@ -186,10 +203,13 @@ purchase_button_passive = Button(command=purchase_upgrade_passive,
                 text=(f"Purchase Passive Upgrade: ${float(upgrade_cost_passive):.2f}"),
                 bg="#F1A991")
 
-current_power = Label(text=(f"$ Per Click: ${float(click_power):.2f}"),
+current_power = Label(text=(f"$ Per Click: ${float(click_power):.3f}"),
                       bg="#F1A991")
 
 money_per_sec = Label(text=(f"$ Per Second: ${float(passive_income):.3f}"),
+                      bg="#F1A991")
+
+total_money_label = Label(text=(f"Total Earned: ${float(total_money):.3f}"),
                       bg="#F1A991")
 
 volume_slider = Scale(window, 
@@ -227,14 +247,14 @@ purchase_button_passive.grid(row=4, column=0, sticky='w', padx=10, pady=2)
 
 current_power.grid(row=3, column=2, sticky='e', padx=10, pady=2)
 money_per_sec.grid(row=4, column=2, sticky='e', padx=10, pady=2)
-
+total_money_label.grid(row=5, column=2, sticky='e', padx=10, pady=2)
 
 window.geometry("900x600")
 window.resizable(False, False)
 
-label1 = Label(window, image=bg)
-label1.place(x=0, y=0, relwidth=1, relheight=1)
-label1.lower() 
+background_image_obj = Label(window, image=bg)
+background_image_obj.place(x=0, y=0, relwidth=1, relheight=1)
+background_image_obj.lower() 
 
 load_game()
 load_ui()
