@@ -1,10 +1,10 @@
 {
-    "money": 1.3595584412271593,
-    "count": 239,
-    "click_power": 0.01,
-    "passive_income": 0.012071067811865475,
-    "upgrade_level": 0,
-    "upgrade_level_passive": 2,
-    "upgrade_cost": 1.5,
-    "upgrade_cost_passive": 0.9746999999999999
+    "money": 2.089563269365915,
+    "count": 423,
+    "click_power": 0.03626527804403767,
+    "passive_income": 0.013660254037844386,
+    "upgrade_level": 5,
+    "upgrade_level_passive": 3,
+    "upgrade_cost": 3.732479999999999,
+    "upgrade_cost_passive": 1.1111579999999996
 }
