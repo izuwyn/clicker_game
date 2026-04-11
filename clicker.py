@@ -4,6 +4,8 @@ from PIL import Image
 import os 
 import json
 import pygame
+import time
+import random
 
 # Patch for backward compatibility
 ctk.CTkLabel.config = ctk.CTkLabel.configure
@@ -38,6 +40,8 @@ gem_upgrade_cost = 10.0
 token_upgrade_cost = 10.0
 gem_upgrade_level = 0
 token_upgrade_level = 0
+mystery_multiplier = 1.0
+last_save_time = 0.0
 
 window = ctk.CTk()
 window.title("Modern Clicker Dashboard")
@@ -101,7 +105,9 @@ def save_game():
         "gem_upgrade_level": gem_upgrade_level,
         "token_upgrade_level": token_upgrade_level,
         "total_gems": total_gems,
-        "total_tokens": total_tokens
+        "total_tokens": total_tokens,
+        "mystery_multiplier": mystery_multiplier,
+        "last_save_time": time.time()
     }
     with open(SAVE_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -112,7 +118,7 @@ def load_game():
     global upgrade_level, upgrade_level_passive, upgrade_cost, upgrade_cost_passive
     global prestige_level, prestige_cost
     global gems, tokens, gem_upgrade_cost, token_upgrade_cost, gem_upgrade_level, token_upgrade_level
-    global total_gems, total_tokens
+    global total_gems, total_tokens, mystery_multiplier, last_save_time
 
     if not os.path.exists(SAVE_FILE):
         print("No save file found, starting fresh.")
@@ -140,6 +146,8 @@ def load_game():
     token_upgrade_level = data.get("token_upgrade_level", 0)
     total_gems = data.get("total_gems", 0.0)
     total_tokens = data.get("total_tokens", 0.0)
+    mystery_multiplier = data.get("mystery_multiplier", 1.0)
+    last_save_time = data.get("last_save_time", 0.0)
     print("Game loaded!")
 
 def update_counters():
@@ -154,11 +162,34 @@ def update_counters():
 def update_powers():
     global click_power, passive_income
     base_click = 0.01 * (upgrade_level ** 0.9 + 1)
-    click_power = base_click * (gem_upgrade_level * 2.0 + 1.0)
+    click_power = base_click * (gem_upgrade_level * 2.0 + 1.0) * mystery_multiplier
     base_passive = 0.01 * (upgrade_level_passive ** 0.65 + 1)
-    passive_income = base_passive * (token_upgrade_level * 2.0 + 1.0)
+    passive_income = base_passive * (token_upgrade_level * 2.0 + 1.0) * mystery_multiplier
+
+def check_offline_progress():
+    global money, total_money
+    if last_save_time > 0:
+        elapsed = time.time() - last_save_time
+        if elapsed > 60:
+            earned = passive_income * (2.0 ** prestige_level) * elapsed
+            if earned > 0:
+                money += earned
+                total_money += earned
+                
+                popup = ctk.CTkToplevel(window)
+                popup.title("Welcome Back!")
+                popup.geometry("400x200")
+                popup.attributes('-topmost', 'true')
+                
+                lbl = ctk.CTkLabel(popup, text=f"You were offline for {int(elapsed//60)} minutes!\n\nYour empire farmed:\n${earned:,.2f}", font=('Montserrat', 20, 'bold'), text_color="#00E676")
+                lbl.pack(expand=True, fill="both", padx=20, pady=20)
+                
+                btn = ctk.CTkButton(popup, text="Awesome!", command=popup.destroy)
+                btn.pack(pady=10)
 
 def load_ui():
+    update_powers()
+    check_offline_progress()
     update_counters()
     purchase_button.config(text=f"Click Upgrade: ${upgrade_cost:.2f}")
     purchase_button_passive.config(text=f"Passive Upgrade: ${upgrade_cost_passive:.2f}")
@@ -305,6 +336,68 @@ def money_per_second():
     update_counters()
     window.after(1000, money_per_second)
 
+def purchase_mystery_box():
+    global tokens, gems, mystery_multiplier, money
+    cost_tokens = 50
+    cost_gems = 50
+    if tokens >= cost_tokens and gems >= cost_gems:
+        tokens -= cost_tokens
+        gems -= cost_gems
+        buy_sound.play()
+        
+        roll = random.random()
+        if roll < 0.4:
+            print("Mystery Box: You got nothing! 😢")
+        elif roll < 0.8:
+            win = passive_income * (2.0 ** prestige_level) * 3600 * 2
+            if win == 0: win = 5000
+            money += win
+            print(f"Mystery Box: Jackpot! You won ${win:,.2f}!")
+        else:
+            mystery_multiplier += 0.2
+            update_powers()
+            current_power.config(text=f"$ Per Click: ${click_power * (2.0 ** prestige_level):.3f}")
+            money_per_sec.config(text=f"$ Per Second: ${passive_income * (2.0 ** prestige_level):.3f}")
+            print("Mystery Box: Permanent +0.2x Multiplier gained!")
+            
+        update_counters()
+    else:
+        no_buy_sound.play()
+        print(f"Not enough resources! Need {cost_gems} Gems & {cost_tokens} Tokens.")
+
+def spawn_golden_token():
+    width = window.winfo_width()
+    height = window.winfo_height()
+    if width <= 100 or height <= 100:
+        width, height = screen_width, screen_height
+
+    x = random.randint(50, width - 100)
+    y = random.randint(150, height - 150)
+    
+    golden_btn = ctk.CTkButton(window, text="🌟", font=('Montserrat', 35), width=70, height=70, corner_radius=35, fg_color="#FFD700", hover_color="#CCAC00")
+    
+    def collect():
+        global money, gems, tokens, total_money, total_gems, total_tokens
+        if golden_btn.winfo_exists():
+            golden_btn.destroy()
+        buy_sound.play()
+        win_money = passive_income * (2.0 ** prestige_level) * 600
+        if win_money == 0: win_money = 1000
+        money += win_money
+        total_money += win_money
+        gems += 50
+        total_gems += 50
+        tokens += 50
+        total_tokens += 50
+        update_counters()
+        print("Collected Golden Token!")
+        
+    golden_btn.configure(command=collect)
+    golden_btn.place(x=x, y=y)
+    
+    window.after(8000, lambda: golden_btn.destroy() if golden_btn.winfo_exists() else None)
+    window.after(random.randint(60000, 180000), spawn_golden_token)
+
 def on_close():
     save_game()
     pygame.mixer.music.stop()
@@ -386,6 +479,9 @@ token_upgrade_btn.pack(pady=4, anchor="w", fill="x")
 prestige_button = ctk.CTkButton(upgrade_left, command=purchase_prestige, text=f"Prestige (x1.0): $1000.00", font=('Montserrat', 16, 'bold'), fg_color="#BB86FC", hover_color="#9965D4", text_color="#121212", corner_radius=10, height=40)
 prestige_button.pack(pady=(12, 4), anchor="w", fill="x")
 
+mystery_btn = ctk.CTkButton(upgrade_left, command=purchase_mystery_box, text=f"Mystery Box (Gacha 🎰): 💎 50 / 🪙 50", font=('Montserrat', 15, 'bold'), fg_color="#FF4500", hover_color="#CC3700", text_color="#121212", corner_radius=10, height=35)
+mystery_btn.pack(pady=4, anchor="w", fill="x")
+
 current_power = ctk.CTkLabel(upgrade_right, text=f"$ Per Click: ${float(click_power):.3f}", font=('Montserrat', 16), text_color="#B0B0B0")
 current_power.pack(pady=4, anchor="e")
 
@@ -416,5 +512,6 @@ load_ui()
 
 autosave()
 money_per_second()
+window.after(random.randint(60000, 180000), spawn_golden_token)
 window.protocol("WM_DELETE_WINDOW", on_close)
 window.mainloop()
