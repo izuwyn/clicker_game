@@ -6,6 +6,8 @@ import json
 import pygame
 import time
 import random
+import sys
+import logging
 
 # Patch for backward compatibility
 ctk.CTkLabel.config = ctk.CTkLabel.configure
@@ -14,9 +16,22 @@ ctk.CTkButton.config = ctk.CTkButton.configure
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
-py_dir = os.path.dirname(os.path.abspath(__file__))
-SAVE_FILE = os.path.join(py_dir, "save.json")
+if getattr(sys, 'frozen', False):
+    asset_dir = sys._MEIPASS
+else:
+    asset_dir = os.path.dirname(os.path.abspath(__file__))
 
+appdata = os.getenv('APPDATA') or os.path.expanduser('~')
+SAVE_FILE = os.path.join(appdata, "IzuwynClicker", "save.json")
+os.makedirs(os.path.dirname(SAVE_FILE), exist_ok=True)
+
+log_path = os.path.join(os.path.expanduser('~'), "IzuwynClicker_log.txt")
+logging.basicConfig(filename=log_path, level=logging.DEBUG)
+
+def handle_exception(exc_type, exc_value, exc_tb):
+    logging.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+
+sys.excepthook = handle_exception
 
 money = float(0)
 
@@ -49,36 +64,36 @@ window.title("Modern Clicker Dashboard")
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
 
-pfp_img = Image.open(os.path.join(py_dir, "pfp.png"))
+pfp_img = Image.open(os.path.join(asset_dir, "pfp.png"))
 photo = ctk.CTkImage(light_image=pfp_img, dark_image=pfp_img, size=(220, 220))
 
-gem_img = Image.open(os.path.join(py_dir, "gem_icon.png"))
+gem_img = Image.open(os.path.join(asset_dir, "gem_icon.png"))
 gem_photo = ctk.CTkImage(light_image=gem_img, dark_image=gem_img, size=(220, 220))
 
-money_img = Image.open(os.path.join(py_dir, "money_icon.png"))
+money_img = Image.open(os.path.join(asset_dir, "money_icon.png"))
 money_photo = ctk.CTkImage(light_image=money_img, dark_image=money_img, size=(220, 220))
 
-token_img = Image.open(os.path.join(py_dir, "token_icon.png"))
+token_img = Image.open(os.path.join(asset_dir, "token_icon.png"))
 token_photo = ctk.CTkImage(light_image=token_img, dark_image=token_img, size=(220, 220))
 
 try:
-    bg_img = Image.open(os.path.join(py_dir, "background.png"))
+    bg_img = Image.open(os.path.join(asset_dir, "background.png"))
     bg = ctk.CTkImage(light_image=bg_img, dark_image=bg_img, size=(screen_width, screen_height))
     
-    icon_photo = PhotoImage(file=os.path.join(py_dir, "pfp.png"))
+    icon_photo = PhotoImage(file=os.path.join(asset_dir, "pfp.png"))
     window.iconphoto(True, icon_photo)
 except:
     pass
 
 pygame.mixer.init()
-pygame.mixer.music.load(os.path.join(py_dir, "background_music.mp3"))
+pygame.mixer.music.load(os.path.join(asset_dir, "background_music.mp3"))
 pygame.mixer.music.set_volume(0.3)
 pygame.mixer.music.play(-1)
 
-buy_sound = pygame.mixer.Sound(os.path.join(py_dir, "purchase.mp3"))
+buy_sound = pygame.mixer.Sound(os.path.join(asset_dir, "purchase.mp3"))
 buy_sound.set_volume(0.4)
 
-no_buy_sound = pygame.mixer.Sound(os.path.join(py_dir, "no_purchase.mp3"))
+no_buy_sound = pygame.mixer.Sound(os.path.join(asset_dir, "no_purchase.mp3"))
 no_buy_sound.set_volume(0.6)
 
 is_muted = False
